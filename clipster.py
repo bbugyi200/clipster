@@ -1079,7 +1079,7 @@ if __name__ == "__main__":
     except ClipsterError as exc:
         if logging.getLogger().getEffectiveLevel() == logging.DEBUG:
             raise
-        else:
-            # Only output the 'human-readable' part.
-            logging.error(exc)
-            sys.exit(1)
+
+        # Only output the 'human-readable' part.
+        logging.error(exc)
+        sys.exit(1)
