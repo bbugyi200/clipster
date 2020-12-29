@@ -1017,52 +1017,6 @@ def find_config():
     return "", data_dir
 
 
-def main():
-    """Start the application. Return an exit status (0 or 1)."""
-
-    # Find default config and data dirs
-    conf_dir, data_dir = find_config()
-
-    # parse command-line arguments
-    args = parse_args()
-
-    # Enable logging
-    logging.basicConfig(
-        format="%(levelname)s:%(message)s",
-        level=getattr(logging, args.log_level.upper()),
-    )
-    logging.debug("Debugging Enabled.")
-
-    config = parse_config(args, data_dir, conf_dir)
-
-    # Launch the daemon
-    if args.daemon:
-        Daemon(config).run()
-    else:
-        board = (
-            args.primary
-            or args.clipboard
-            or config.get("clipster", "default_selection")
-        )
-        if board not in config.get("clipster", "active_selections"):
-            raise ClipsterError(
-                "{0} not in 'active_selections' in config.".format(board)
-            )
-        config.set("clipster", "default_selection", board)
-        client = Client(config, args)
-
-        if args.output:
-            # Ask server for clipboard history
-            output = client.output()
-            if not isinstance(output, str):
-                # python2 needs unicode explicitly encoded
-                output = output.encode("utf-8")
-            print(output, end="")
-        else:
-            # Read from stdin and send to server
-            client.update()
-
-
 def safe_decode(data):
     """Convenience method to ensure everything is utf-8."""
 
@@ -1073,13 +1027,61 @@ def safe_decode(data):
     return data
 
 
-if __name__ == "__main__":
+def main() -> int:
+    """Start the application. Return an exit status (0 or 1)."""
+
     try:
-        main()
+        # Find default config and data dirs
+        conf_dir, data_dir = find_config()
+
+        # parse command-line arguments
+        args = parse_args()
+
+        # Enable logging
+        logging.basicConfig(
+            format="%(levelname)s:%(message)s",
+            level=getattr(logging, args.log_level.upper()),
+        )
+        logging.debug("Debugging Enabled.")
+
+        config = parse_config(args, data_dir, conf_dir)
+
+        # Launch the daemon
+        if args.daemon:
+            Daemon(config).run()
+        else:
+            board = (
+                args.primary
+                or args.clipboard
+                or config.get("clipster", "default_selection")
+            )
+            if board not in config.get("clipster", "active_selections"):
+                raise ClipsterError(
+                    "{0} not in 'active_selections' in config.".format(board)
+                )
+            config.set("clipster", "default_selection", board)
+            client = Client(config, args)
+
+            if args.output:
+                # Ask server for clipboard history
+                output = client.output()
+                if not isinstance(output, str):
+                    # python2 needs unicode explicitly encoded
+                    output = output.encode("utf-8")
+                print(output, end="")
+            else:
+                # Read from stdin and send to server
+                client.update()
     except ClipsterError as exc:
         if logging.getLogger().getEffectiveLevel() == logging.DEBUG:
             raise
 
         # Only output the 'human-readable' part.
         logging.error(exc)
-        sys.exit(1)
+        return 1
+    else:
+        return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
