@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """Clipster - Clipboard manager."""
 
 from __future__ import print_function

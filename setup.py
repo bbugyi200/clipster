@@ -1,6 +1,22 @@
 # -*- coding: utf-8 -*-
 
+from pathlib import Path
+from typing import Iterator, List
+
 from setuptools import find_packages, setup
+
+
+def install_requires() -> List[str]:
+    return list(_requires("requirements.txt"))
+
+
+def _requires(reqtxt_basename: str) -> Iterator[str]:
+    reqtxt = Path(__file__).parent / reqtxt_basename
+    reqs = reqtxt.read_text().split("\n")
+    for req in reqs:
+        if not req or req.lstrip().startswith(("#", "-")):
+            continue
+        yield req
 
 
 setup(
@@ -21,8 +37,12 @@ setup(
     ],
     zip_safe=False,
     platforms="any",
-    install_requires=(),
-    scripts=["clipster"],
+    install_requires=install_requires(),
+    entry_points={
+        "console_scripts": [
+            "clipster = clipster:main",
+        ]
+    },
     classifiers=[
         # As from http://pypi.python.org/pypi?%3Aaction=list_classifiers
         # 'Development Status :: 1 - Planning',
