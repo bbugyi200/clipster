@@ -17,6 +17,7 @@ import sys
 import tempfile
 
 from gi import require_version
+import prometheus_client as pc
 
 
 require_version("Gdk", "3.0")
@@ -29,6 +30,13 @@ try:
     from gi.repository import Wnck
 except (ImportError, ValueError):
     Wnck = None
+
+
+pc_registry = pc.CollectorRegistry()
+pc_history_file_writes = pc.Counter(
+    "clipster_history_file_writes",
+    "Number of times the history file has been written to.",
+)
 
 
 class suppress_if_errno:
@@ -380,6 +388,8 @@ class Daemon:
         """Write clipboard history to file."""
 
         if self.update_history_file:
+            pc_history_file_writes.inc()
+
             # Limit history file to contain last 'history_size' items
             limit = self.config.getint("clipster", "history_size")
             # If limit is 0, don't write to file
@@ -780,6 +790,9 @@ class Daemon:
         # Set up socket, pid file etc
         self.prepare_files()
 
+        # Start the prometheus metrics client.
+        pc.start_http_server(9102)
+
         # We need to get the display instance from the window
         # for use in obtaining mouse state.
         # POPUP windows can do this without having to first show the window
@@ -1062,9 +1075,16 @@ def main() -> int:
             config.set("clipster", "default_selection", board)
             client = Client(config, args)
 
+            pc_history_count = pc.Counter(
+                "clipster_history_count",
+                "Count of items retrieved from clipster's history file by"
+                " client.",
+                registry=pc_registry,
+            )
             if args.output:
                 # Ask server for clipboard history
                 output = client.output()
+                pc_history_count.inc(len(output.split(args.delim)))
                 if not isinstance(output, str):
                     # python2 needs unicode explicitly encoded
                     output = output.encode("utf-8")
@@ -1080,6 +1100,9 @@ def main() -> int:
         logging.error(exc)
         return 1
     else:
+        pc.pushadd_to_gateway(
+            "localhost:9091", job="clipster_client", registry=pc_registry
+        )
         return 0
 
 
