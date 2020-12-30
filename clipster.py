@@ -1134,65 +1134,69 @@ def configure_logging(log_level_str: str) -> None:
     logger.debug("Debugging Enabled.")
 
 
+def run(args: ap.Namespace) -> int:
+    # Find default config and data dirs
+    conf_dir, data_dir = find_config()
+
+    # Enable logging
+    configure_logging(args.log_level.upper())
+
+    config = parse_config(args, data_dir, conf_dir)
+
+    # Launch the daemon
+    if args.daemon:
+        Daemon(config).run()
+    else:
+        board = (
+            args.primary
+            or args.clipboard
+            or config.get("clipster", "default_selection")
+        )
+        if board not in config.get("clipster", "active_selections"):
+            raise ClipsterError(
+                "{0} not in 'active_selections' in config.".format(board)
+            )
+        config.set("clipster", "default_selection", board)
+        client = Client(config, args)
+
+        pc_registry = pc.CollectorRegistry()
+        pc_history_count = pc.Counter(
+            "clipster_history_count",
+            "Count of items retrieved from clipster's history file by client.",
+            registry=pc_registry,
+        )
+        if args.output:
+            # Ask server for clipboard history
+            output = client.output()
+            pc_history_count.inc(len(output.split(args.delim)))
+            print(output, end="")
+        else:
+            # Read from stdin and send to server
+            client.update()
+
+        try:
+            pc.pushadd_to_gateway(
+                PC_GATEWAY_HOST,
+                job="clipster_client",
+                registry=pc_registry,
+            )
+        except URLError:
+            logger.warning(
+                "The prometheus PushGateway does not seem to be online (%s).",
+                PC_GATEWAY_HOST,
+            )
+
+    return 0
+
+
 def main() -> int:
     """Start the application. Return an exit status (0 or 1)."""
 
+    # parse command-line arguments
+    args = parse_args()
+
     try:
-        # Find default config and data dirs
-        conf_dir, data_dir = find_config()
-
-        # parse command-line arguments
-        args = parse_args()
-
-        # Enable logging
-        configure_logging(args.log_level.upper())
-
-        config = parse_config(args, data_dir, conf_dir)
-
-        # Launch the daemon
-        if args.daemon:
-            Daemon(config).run()
-        else:
-            board = (
-                args.primary
-                or args.clipboard
-                or config.get("clipster", "default_selection")
-            )
-            if board not in config.get("clipster", "active_selections"):
-                raise ClipsterError(
-                    "{0} not in 'active_selections' in config.".format(board)
-                )
-            config.set("clipster", "default_selection", board)
-            client = Client(config, args)
-
-            pc_registry = pc.CollectorRegistry()
-            pc_history_count = pc.Counter(
-                "clipster_history_count",
-                "Count of items retrieved from clipster's history file by"
-                " client.",
-                registry=pc_registry,
-            )
-            if args.output:
-                # Ask server for clipboard history
-                output = client.output()
-                pc_history_count.inc(len(output.split(args.delim)))
-                print(output, end="")
-            else:
-                # Read from stdin and send to server
-                client.update()
-
-            try:
-                pc.pushadd_to_gateway(
-                    PC_GATEWAY_HOST,
-                    job="clipster_client",
-                    registry=pc_registry,
-                )
-            except URLError:
-                logger.warning(
-                    "The prometheus PushGateway does not seem to be online"
-                    " (%s).",
-                    PC_GATEWAY_HOST,
-                )
+        return run(args)
     except ClipsterError as exc:
         if logging.getLogger().getEffectiveLevel() == logging.DEBUG:
             raise
@@ -1205,8 +1209,6 @@ def main() -> int:
             "Clipster crashed when an exception was raised: %r", args
         )
         raise
-    else:
-        return 0
 
 
 if __name__ == "__main__":
