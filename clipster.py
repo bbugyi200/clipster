@@ -3,7 +3,7 @@
 from __future__ import print_function
 
 import argparse
-from configparser import ConfigParser as SafeConfigParser
+from configparser import ConfigParser
 from contextlib import closing
 import errno
 from getpass import getuser
@@ -211,7 +211,7 @@ class Daemon:
 
     # pylint: disable=too-many-instance-attributes
 
-    def __init__(self, config):
+    def __init__(self, config: ConfigParser) -> None:
         """Set up clipboard objects and history dict."""
 
         self.config = config
@@ -767,7 +767,7 @@ class Daemon:
                 self.config.get("clipster", "ignore_patterns_file")
             )
 
-    def exit(self):
+    def exit(self) -> None:
         """Clean up things before exiting."""
 
         logger.debug("Daemon exiting...")
@@ -785,7 +785,7 @@ class Daemon:
             logger.warning("Failed to update history file: %s", self.hist_file)
         Gtk.main_quit()
 
-    def run(self):
+    def run(self) -> None:
         """Launch the clipboard manager daemon.
         Listen for clipboard events & client socket connections."""
 
@@ -965,7 +965,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def parse_config(args, data_dir, conf_dir):
+def parse_config(args, data_dir, conf_dir) -> ConfigParser:
     """Configuration derived from defaults & file."""
 
     # Set some config defaults
@@ -996,7 +996,7 @@ def parse_config(args, data_dir, conf_dir):
         "whitelist_classes": "",
     }  # Comma-separated list of WM_CLASS to identify apps from which to not ignore owner-change events
 
-    config = SafeConfigParser(config_defaults)
+    config = ConfigParser(config_defaults)
     config.add_section("clipster")
 
     # Try to read config file (either passed in, or default value)
