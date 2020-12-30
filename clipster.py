@@ -1,5 +1,7 @@
 """Clipster - Clipboard manager."""
 
+# pylint: disable=line-too-long
+
 from __future__ import print_function
 
 import argparse as ap
@@ -16,7 +18,7 @@ import socket
 import stat
 import sys
 import tempfile
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Type, Union
 from urllib.error import URLError
 
 from gi import require_version
@@ -69,7 +71,11 @@ class suppress_if_errno:
 
     """
 
-    def __init__(self, exceptions, exc_val) -> None:
+    def __init__(
+        self,
+        exceptions: Union[Type[Exception], Tuple[Type[Exception], ...]],
+        exc_val: int,
+    ) -> None:
         self._exceptions = exceptions
         self._exc_val = exc_val
 
@@ -315,7 +321,7 @@ class Daemon:
         model.clear()
         self.window.hide()
 
-    def selection_widget(self, board) -> None:
+    def selection_widget(self, board: str) -> None:
         """GUI window for selecting items from clipboard history."""
 
         # Create windows & widgets
@@ -419,12 +425,12 @@ class Daemon:
         # Return true to make the timeout handler recur
         return True
 
-    def read_board(self, board):
+    def read_board(self, board: str) -> AnyStr:
         """Return the text on the clipboard."""
 
         return safe_decode(getattr(self, board.lower()).wait_for_text())
 
-    def update_board(self, board, data="") -> None:
+    def update_board(self, board: str, data: str = "") -> None:
         """Update a clipboard. Will trigger an owner-change event."""
 
         selection = getattr(self, board.lower())
@@ -432,7 +438,7 @@ class Daemon:
         if not data:
             selection.clear()
 
-    def remove_history(self, board, text) -> None:
+    def remove_history(self, board: str, text: str) -> None:
         """If text exists in the history, remove it."""
 
         if text in self.boards[board]:
@@ -441,7 +447,7 @@ class Daemon:
             # Flag the history file for updating
             self.update_history_file = True
 
-    def update_history(self, board, text) -> None:
+    def update_history(self, board: str, text: str) -> None:  # noqa: C901
         """Update the in-memory clipboard history."""
 
         for ignore in self.ignore_patterns:
@@ -462,10 +468,11 @@ class Daemon:
 
         logger.debug("Updating clipboard: %s", board)
 
-        text = safe_decode(text)
+        text_str = safe_decode(text)
+        assert isinstance(text_str, str)
 
         if not self.config.getboolean("clipster", "duplicates"):
-            self.remove_history(board, text)
+            self.remove_history(board, text_str)
         diff = self.config.getint("clipster", "smart_update")
         try:
             last_item = self.boards[board][-1]
@@ -973,7 +980,9 @@ def parse_args() -> ap.Namespace:
     return parser.parse_args()
 
 
-def parse_config(args: ap.Namespace, data_dir: str, conf_dir: str) -> ConfigParser:
+def parse_config(
+    args: ap.Namespace, data_dir: str, conf_dir: str
+) -> ConfigParser:
     """Configuration derived from defaults & file."""
 
     # Set some config defaults
