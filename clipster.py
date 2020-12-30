@@ -18,7 +18,7 @@ import socket
 import stat
 import sys
 import tempfile
-from typing import List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 from urllib.error import URLError
 
 from gi import require_version
@@ -38,10 +38,6 @@ except (ImportError, ValueError):
 
 
 logger = logging.getLogger(__name__)
-pc_history_file_writes = pc.Counter(
-    "clipster_history_file_writes",
-    "Number of times the history file has been written to.",
-)
 
 AnyStr = Union[bytes, str]
 
@@ -82,7 +78,7 @@ class suppress_if_errno:
     def __enter__(self) -> None:
         pass
 
-    def __exit__(self, exctype, excinst, exctb):
+    def __exit__(self, exctype: Any, excinst: Any, exctb: Any) -> Any:
         # Unlike isinstance and issubclass, CPython exception handling
         # currently only looks at the concrete type hierarchy (ignoring
         # the instance and subclass checking hooks). While Guido considers
@@ -229,11 +225,12 @@ class Daemon:
         self.config = config
         self.patterns = []
         self.ignore_patterns = []
-        self.window = self.p_id = self.c_id = self.sock = None
+        self.window = self.p_id = self.c_id = None
+        self.sock: Optional[socket.socket] = None
         self.sock_file = self.config.get("clipster", "socket_file")
         self.primary = Gtk.Clipboard.get(Gdk.SELECTION_PRIMARY)
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
-        self.boards = {"PRIMARY": [], "CLIPBOARD": []}
+        self.boards: Dict[str, List[str]] = {"PRIMARY": [], "CLIPBOARD": []}
         self.hist_file = self.config.get("clipster", "history_file")
         self.pid_file = self.config.get("clipster", "pid_file")
         self.client_msgs = {}
@@ -263,7 +260,18 @@ class Daemon:
                 " (libwnck3)."
             )
 
-    def keypress_handler(self, widget, event, board, tree_select) -> None:
+        self.pc_history_file_writes = pc.Counter(
+            "clipster_history_file_writes",
+            "Number of times the history file has been written to.",
+        )
+
+    def keypress_handler(
+        self,
+        _widget: Gtk.Widget,
+        event: Gdk.Event,
+        board: str,
+        tree_select: Gtk.TreeSelection,
+    ) -> None:
         """Handle selection_widget keypress events."""
 
         # Handle select with return or mouse
@@ -276,9 +284,10 @@ class Daemon:
         if event.keyval == Gdk.KEY_Escape:
             self.window.hide()
 
-    def delete_handler(self, event, board, tree_select) -> None:
+    def delete_handler(
+        self, _event: Gdk.Event, board: str, tree_select: Gtk.TreeSelection
+    ) -> None:
         """Delete selected history entries."""
-
         model, treepaths = tree_select.get_selected_rows()
         for tree in treepaths:
             treeiter = model.get_iter(tree)
@@ -307,7 +316,9 @@ class Daemon:
             # Remove entry from UI
             model.remove(treeiter)
 
-    def activate_handler(self, event, board, tree_select) -> None:
+    def activate_handler(
+        self, _event: Gdk.Event, board: str, tree_select: Gtk.TreeSelection
+    ) -> None:
         """Action selected history items."""
 
         # Get selection
@@ -406,7 +417,7 @@ class Daemon:
         """Write clipboard history to file."""
 
         if self.update_history_file:
-            pc_history_file_writes.inc()
+            self.pc_history_file_writes.inc()
 
             # Limit history file to contain last 'history_size' items
             limit = self.config.getint("clipster", "history_size")
@@ -542,7 +553,7 @@ class Daemon:
                 logger.debug("Syncing board %s to %s", board, boards[0])
                 self.update_board(boards[0], text)
 
-    def owner_change(self, board, event) -> bool:
+    def owner_change(self, board: Gtk.Clipboard, event: Gdk.Event) -> bool:
         """Handler for owner-change clipboard events."""
 
         logger.debug("owner-change event!")
@@ -601,7 +612,7 @@ class Daemon:
         board.handler_unblock(event_id)
         return False
 
-    def socket_accept(self, sock, _) -> bool:
+    def socket_accept(self, sock: socket.socket, _: Any) -> bool:
         """Accept a connection and 'select' it for readability."""
 
         conn, _ = sock.accept()
@@ -610,7 +621,7 @@ class Daemon:
         logger.debug("Client connection received.")
         return True
 
-    def socket_recv(self, conn, _) -> bool:
+    def socket_recv(self, conn: socket.socket, _: Any) -> bool:
         """Try to recv from an accepted connection."""
 
         max_input = self.config.getint("clipster", "max_input")
@@ -631,7 +642,7 @@ class Daemon:
         # Return false to remove conn from GObject.io_add_watch list
         return False
 
-    def process_msg(self, conn) -> None:
+    def process_msg(self, conn: socket.socket) -> None:  # noqa: C901
         """Process message received from client, sending reply if required."""
 
         try:
@@ -853,7 +864,7 @@ class Daemon:
         Gtk.main()
 
 
-def get_wm_class_from_active_window():
+def get_wm_class_from_active_window() -> str:
     """Returns the current active window's WM_CLASS"""
     screen = Wnck.Screen.get_default()
     screen.force_update()
