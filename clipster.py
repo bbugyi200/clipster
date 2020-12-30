@@ -6,6 +6,7 @@ import argparse
 from configparser import ConfigParser as SafeConfigParser
 from contextlib import closing
 import errno
+from getpass import getuser
 import json
 import logging
 import os
@@ -15,6 +16,7 @@ import socket
 import stat
 import sys
 import tempfile
+from typing import Optional
 from urllib.error import URLError
 
 from gi import require_version
@@ -1050,6 +1052,50 @@ def safe_decode(data):
     return data
 
 
+def configure_logging(log_level_str: str) -> None:
+    log_level = getattr(logging, log_level_str.upper())
+
+    fmt = (
+        "%(asctime)s.%(msecs)-3d  |  %(levelname)-7s  |  PID:%(process)d  | "
+        " %(message)s  [%(module)s::%(funcName)s::%(lineno)d]"
+    )
+    formatter = lambda datefmt: logging.Formatter(fmt, datefmt=datefmt)
+
+    root = logging.root
+    root.setLevel(log_level)
+
+    sh = logging.StreamHandler()
+    sh.formatter = formatter("%H:%M:%S")
+    root.addHandler(sh)
+
+    log_basename = "clipster.log"
+    log_fname: Optional[str] = None
+    all_log_dirs = [
+        "/var/log",
+        "/var/tmp",
+        "/tmp",
+        os.environ.get("HOME", f"/home/{getuser()}"),
+    ]
+    for log_dirname in all_log_dirs:
+        if os.access(log_dirname, os.W_OK):
+            log_fname = f"{log_dirname}/{log_basename}"
+            break
+
+    if log_fname is None:
+        logger.warning(
+            "We do not have permission to write to any of the following"
+            f" directories and thus cannot create a log file: {all_log_dirs}"
+        )
+    else:
+        fh = logging.FileHandler(log_fname)
+        fh.formatter = formatter("%Y-%m-%d %H:%M:%S")
+        root.addHandler(fh)
+
+        logger.debug("Logging to %s.", log_fname)
+
+    logger.debug("Debugging Enabled.")
+
+
 def main() -> int:
     """Start the application. Return an exit status (0 or 1)."""
 
@@ -1061,11 +1107,7 @@ def main() -> int:
         args = parse_args()
 
         # Enable logging
-        logging.basicConfig(
-            format="%(levelname)s:%(message)s",
-            level=getattr(logging, args.log_level.upper()),
-        )
-        logger.debug("Debugging Enabled.")
+        configure_logging(args.log_level.upper())
 
         config = parse_config(args, data_dir, conf_dir)
 
