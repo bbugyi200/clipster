@@ -33,6 +33,7 @@ except (ImportError, ValueError):
     Wnck = None
 
 
+logger = logging.getLogger(__name__)
 pc_history_file_writes = pc.Counter(
     "clipster_history_file_writes",
     "Number of times the history file has been written to.",
@@ -109,12 +110,12 @@ class Client:
             self.client_action = "ERASE"
         elif args.output or args.search is not None:
             self.client_action = "BOARD"
-        logging.debug("client_action: %s", self.client_action)
+        logger.debug("client_action: %s", self.client_action)
 
     def update(self):
         """Send a signal and (optional) data from STDIN to daemon socket."""
 
-        logging.debug("Connecting to server to update.")
+        logger.debug("Connecting to server to update.")
         with closing(
             socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         ) as sock:
@@ -126,7 +127,7 @@ class Client:
                 raise ClipsterError(
                     "Error connecting to socket. Is daemon running?"
                 )
-            logging.debug("Sending request to server.")
+            logger.debug("Sending request to server.")
             # Fix for http://bugs.python.org/issue1633941 in py 2.x
             # Send message 'header' - count is 0 (i.e to be ignored)
             sock.sendall(
@@ -160,7 +161,7 @@ class Client:
     def output(self):
         """Send a signal and count to daemon socket requesting items from history."""
 
-        logging.debug("Connecting to server to query history.")
+        logger.debug("Connecting to server to query history.")
         with closing(
             socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         ) as sock:
@@ -172,7 +173,7 @@ class Client:
                 raise ClipsterError(
                     "Error connecting to socket. Is daemon running?"
                 )
-            logging.debug("Sending request to server.")
+            logger.debug("Sending request to server.")
             # Send message 'header'
             message = "{0}:{1}:{2}".format(
                 self.client_action,
@@ -188,7 +189,7 @@ class Client:
             while True:
                 try:
                     recv = sock.recv(8192)
-                    logging.debug("Received data from server.")
+                    logger.debug("Received data from server.")
                     if not recv:
                         break
                     data.append(safe_decode(recv))
@@ -232,15 +233,15 @@ class Daemon:
                 self.config.get("clipster", "whitelist_classes")
             )
             if self.whitelist_classes:
-                logging.debug(
+                logger.debug(
                     "Whitelist classes enabled for: %s", self.whitelist_classes
                 )
             if self.blacklist_classes:
-                logging.debug(
+                logger.debug(
                     "Blacklist classes enabled for: %s", self.blacklist_classes
                 )
         else:
-            logging.error(
+            logger.error(
                 "'whitelist_classes' or 'blacklist_classes' require Wnck"
                 " (libwnck3)."
             )
@@ -266,7 +267,7 @@ class Daemon:
             treeiter = model.get_iter(tree)
             item = model[treeiter][1]
             item = safe_decode(item)
-            logging.debug("Deleting history entry: %s", item)
+            logger.debug("Deleting history entry: %s", item)
             # If deleted item is currently on the clipboard, clear it
             if self.read_board(board) == item:
                 self.update_board(board)
@@ -280,7 +281,7 @@ class Daemon:
                 if board_list[0] in self.config.get(
                     "clipster", "active_selections"
                 ):
-                    logging.debug("Synchronising delete to other board.")
+                    logger.debug("Synchronising delete to other board.")
                     # Remove item from history
                     self.remove_history(board_list[0], item)
                     # If deleted item is current on the clipboard, clear it
@@ -395,7 +396,7 @@ class Daemon:
             # If limit is 0, don't write to file
             if limit:
                 hist = {x: y[-limit:] for x, y in self.boards.items()}
-                logging.debug("Writing history to file.")
+                logger.debug("Writing history to file.")
                 with tempfile.NamedTemporaryFile(
                     dir=self.config.get("clipster", "data_dir"), delete=False
                 ) as tmp_file:
@@ -403,7 +404,7 @@ class Daemon:
                 os.rename(tmp_file.name, self.hist_file)
                 self.update_history_file = False
         else:
-            logging.debug("History unchanged - not writing to file.")
+            logger.debug("History unchanged - not writing to file.")
         # Return true to make the timeout handler recur
         return True
 
@@ -424,7 +425,7 @@ class Daemon:
         """If text exists in the history, remove it."""
 
         if text in self.boards[board]:
-            logging.debug("Removing from history.")
+            logger.debug("Removing from history.")
             self.boards[board].remove(text)
             # Flag the history file for updating
             self.update_history_file = True
@@ -435,7 +436,7 @@ class Daemon:
         for ignore in self.ignore_patterns:
             # If text matches an ignore pattern, don't update history
             if re.search(ignore, text):
-                logging.debug(
+                logger.debug(
                     "Pattern: '%s' matches selection: '%s' - ignoring.",
                     ignore,
                     text,
@@ -444,11 +445,11 @@ class Daemon:
 
         if self.ignore_next[board]:
             # Ignore history update this time and reset ignore flag
-            logging.debug("Ignoring update of %s history", board)
+            logger.debug("Ignoring update of %s history", board)
             self.ignore_next[board] = False
             return
 
-        logging.debug("Updating clipboard: %s", board)
+        logger.debug("Updating clipboard: %s", board)
 
         text = safe_decode(text)
 
@@ -468,7 +469,7 @@ class Daemon:
         ):
             # Make length difference a positive number before comparing
             if abs(len(text) - len(last_item)) <= diff:
-                logging.debug("smart-update: removing.")
+                logger.debug("smart-update: removing.")
                 # new selection is a longer/shorter version of previous
                 self.boards[board].pop()
 
@@ -486,7 +487,7 @@ class Daemon:
             try:
                 for match in set(re.findall(pattern, text)):
                     if match != text:
-                        logging.debug(
+                        logger.debug(
                             "Pattern '%s' matched in: %s", pattern, text
                         )
                         if not self.config.getboolean(
@@ -502,7 +503,7 @@ class Daemon:
                         else:
                             self.boards[board].insert(-1, match)
             except re.error as exc:
-                logging.warning(
+                logger.warning(
                     "Skipping invalid pattern '%s': %s", pattern, exc.args[0]
                 )
 
@@ -510,7 +511,7 @@ class Daemon:
         self.update_history_file = True
         if self.config.getboolean("clipster", "write_on_change"):
             self.write_history_file()
-        logging.debug(self.boards[board])
+        logger.debug(self.boards[board])
         if self.config.getboolean("clipster", "sync_selections"):
             # Whichever board we just set, set the other one, if it's active
             boards = list(self.boards)
@@ -520,15 +521,15 @@ class Daemon:
                 boards[0] in self.config.get("clipster", "active_selections")
                 and self.read_board(boards[0]) != text
             ):
-                logging.debug("Syncing board %s to %s", board, boards[0])
+                logger.debug("Syncing board %s to %s", board, boards[0])
                 self.update_board(boards[0], text)
 
     def owner_change(self, board, event):
         """Handler for owner-change clipboard events."""
 
-        logging.debug("owner-change event!")
+        logger.debug("owner-change event!")
         selection = str(event.selection)
-        logging.debug("selection: %s", selection)
+        logger.debug("selection: %s", selection)
         active = self.config.get("clipster", "active_selections").split(",")
 
         if selection not in active:
@@ -544,10 +545,10 @@ class Daemon:
             ) or (
                 self.blacklist_classes and wm_class in self.blacklist_classes
             ):
-                logging.debug("Ignoring active window.")
+                logger.debug("Ignoring active window.")
                 return True
 
-        logging.debug("Selection in 'active_selections'")
+        logger.debug("Selection in 'active_selections'")
         event_id = selection == "PRIMARY" and self.p_id or self.c_id
         # Some apps update primary during mouse drag (chrome)
         # Block at start to prevent repeated triggering
@@ -559,22 +560,22 @@ class Daemon:
         # Try to get text from clipboard
         text = board.wait_for_text()
         if text:
-            logging.debug("Selection is text.")
+            logger.debug("Selection is text.")
             self.update_history(selection, text)
             # If no text received, either the selection was an empty string,
             # or the board contains non-text content.
         else:
             # First item in tuple is bool, False if no targets
             if board.wait_for_targets()[0]:
-                logging.debug("Selection is not text - ignoring.")
+                logger.debug("Selection is not text - ignoring.")
             else:
-                logging.debug(
+                logger.debug(
                     "Clipboard cleared or empty. Reinstating from history."
                 )
                 if self.boards[selection]:
                     self.update_board(selection, self.boards[selection][-1])
                 else:
-                    logging.debug(
+                    logger.debug(
                         "No history available, leaving clipboard empty."
                     )
 
@@ -587,7 +588,7 @@ class Daemon:
         conn, _ = sock.accept()
         self.client_msgs[conn.fileno()] = []
         GObject.io_add_watch(conn, GObject.IO_IN, self.socket_recv)
-        logging.debug("Client connection received.")
+        logger.debug("Client connection received.")
         return True
 
     def socket_recv(self, conn, _):
@@ -604,8 +605,8 @@ class Daemon:
             else:
                 return True
         except socket.error as exc:
-            logging.error("Socket error %s", exc)
-            logging.debug("Exception:", exc_info=True)
+            logger.error("Socket error %s", exc)
+            logger.debug("Exception:", exc_info=True)
 
         conn.close()
         # Return false to remove conn from GObject.io_add_watch list
@@ -629,40 +630,40 @@ class Daemon:
                 raise ValueError()
             count = int(count)
         except (TypeError, ValueError):
-            logging.error("Invalid message received via socket: %s", msg_str)
+            logger.error("Invalid message received via socket: %s", msg_str)
             return
-        logging.debug(
+        logger.debug(
             "Received: sig:%s, board:%s, count:%s", sig, board, count
         )
         if sig == "SELECT":
             self.selection_widget(board)
         elif sig == "SEND":
             if content is not None:
-                logging.debug("Received content: %s", content)
+                logger.debug("Received content: %s", content)
                 self.update_board(board, content)
             else:
                 raise ClipsterError("No content received!")
         elif sig == "BOARD":
             result = self.boards[board]
             if content:
-                logging.debug("Searching for pattern: %s", content)
+                logger.debug("Searching for pattern: %s", content)
                 result = [
                     x for x in self.boards[board] if re.search(content, x)
                 ]
-            logging.debug(
+            logger.debug(
                 "Sending requested selection(s): %s", result[-count:][::-1]
             )
             # Send list (reversed) as json to preserve structure
             try:
                 conn.sendall(json.dumps(result[-count:][::-1]).encode("utf-8"))
             except (socket.error, OSError) as exc:
-                logging.error("Socket error %s", exc)
-                logging.debug("Exception:", exc_info=True)
+                logger.error("Socket error %s", exc)
+                logger.debug("Exception:", exc_info=True)
         elif sig == "IGNORE":
             self.ignore_next[board] = True
         elif sig == "DELETE":
             if content:
-                logging.debug(
+                logger.debug(
                     "Deleting clipboard items matching text: %s", content
                 )
                 self.remove_history(board, content)
@@ -671,15 +672,15 @@ class Daemon:
                     self.update_board(board)
             else:
                 try:
-                    logging.debug("Deleting last item in history.")
+                    logger.debug("Deleting last item in history.")
                     last = self.boards[board].pop()
                     # If deleted item is current on the clipboard, clear it
                     if self.read_board(board) == last:
                         self.update_board(board)
                 except IndexError:
-                    logging.debug("History already empty.")
+                    logger.debug("History already empty.")
         elif sig == "ERASE":
-            logging.debug(
+            logger.debug(
                 "Erasing clipboard (%d items)", len(self.boards[board])
             )
             self.boards[board] = []
@@ -694,10 +695,10 @@ class Daemon:
             )
             with open(patfile) as pat_f:
                 patts = [x.strip() for x in pat_f.read().splitlines()]
-                logging.debug("Loaded patterns: %s", ",".join(patts))
+                logger.debug("Loaded patterns: %s", ",".join(patts))
                 return patts
         except FileNotFoundError as exc:
-            logging.warning(
+            logger.warning(
                 "Unable to read patterns file: %s %s", patfile, exc.strerror
             )
 
@@ -715,7 +716,7 @@ class Daemon:
                 try:
                     pid = int(runf_r.read())
                 except ValueError:
-                    logging.debug("Invalid pid file, attempting to overwrite.")
+                    logger.debug("Invalid pid file, attempting to overwrite.")
                 else:
                     # pid is an int, determine if this corresponds to a running daemon.
                     try:
@@ -751,14 +752,14 @@ class Daemon:
 
         # Read in patterns file
         if self.config.getboolean("clipster", "extract_patterns"):
-            logging.debug("extract_patterns enabled.")
+            logger.debug("extract_patterns enabled.")
             self.patterns = self.read_patt_file(
                 self.config.get("clipster", "extract_patterns_file")
             )
 
         # Read in ignore_patterns file
         if self.config.getboolean("clipster", "ignore_patterns"):
-            logging.debug("ignore_patterns enabled.")
+            logger.debug("ignore_patterns enabled.")
             self.ignore_patterns = self.read_patt_file(
                 self.config.get("clipster", "ignore_patterns_file")
             )
@@ -766,19 +767,19 @@ class Daemon:
     def exit(self):
         """Clean up things before exiting."""
 
-        logging.debug("Daemon exiting...")
+        logger.debug("Daemon exiting...")
         try:
             os.unlink(self.sock_file)
         except FileNotFoundError:
-            logging.warning("Failed to remove socket file: %s", self.sock_file)
+            logger.warning("Failed to remove socket file: %s", self.sock_file)
         try:
             os.unlink(self.pid_file)
         except FileNotFoundError:
-            logging.warning("Failed to remove pid file: %s", self.pid_file)
+            logger.warning("Failed to remove pid file: %s", self.pid_file)
         try:
             self.write_history_file()
         except FileNotFoundError:
-            logging.warning(
+            logger.warning(
                 "Failed to update history file: %s", self.hist_file
             )
         Gtk.main_quit()
@@ -816,7 +817,7 @@ class Daemon:
         if history_timeout and not self.config.getboolean(
             "clipster", "write_on_change"
         ):
-            logging.debug(
+            logger.debug(
                 "Writing history file every %s seconds", history_timeout
             )
             GObject.timeout_add_seconds(
@@ -832,7 +833,7 @@ def get_wm_class_from_active_window():
     screen.force_update()
     active_window = screen.get_active_window()
     wm_class = active_window.get_class_group_name()
-    logging.debug("Active window class is %s", wm_class)
+    logger.debug("Active window class is %s", wm_class)
     return wm_class
 
 
@@ -993,12 +994,12 @@ def parse_config(args, data_dir, conf_dir):
     conf_file = os.path.join(
         config.get("clipster", "conf_dir"), "clipster.ini"
     )
-    logging.debug("Trying to read config file: %s", conf_file)
+    logger.debug("Trying to read config file: %s", conf_file)
     result = config.read(conf_file)
     if not result:
-        logging.debug("Unable to read config file: %s", conf_file)
+        logger.debug("Unable to read config file: %s", conf_file)
 
-    logging.debug(
+    logger.debug(
         "Merged config: %s", sorted(dict(config.items("clipster")).items())
     )
 
@@ -1055,7 +1056,7 @@ def main() -> int:
             format="%(levelname)s:%(message)s",
             level=getattr(logging, args.log_level.upper()),
         )
-        logging.debug("Debugging Enabled.")
+        logger.debug("Debugging Enabled.")
 
         config = parse_config(args, data_dir, conf_dir)
 
@@ -1100,7 +1101,7 @@ def main() -> int:
                     gateway_host, job="clipster_client", registry=pc_registry
                 )
             except URLError:
-                logging.warning(
+                logger.warning(
                     "The prometheus PushGateway does not seem to be online (%s).",
                     gateway_host,
                 )
@@ -1109,7 +1110,7 @@ def main() -> int:
             raise
 
         # Only output the 'human-readable' part.
-        logging.error(exc)
+        logger.error(exc)
         return 1
     else:
         return 0
