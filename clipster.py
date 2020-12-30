@@ -1095,14 +1095,14 @@ def safe_decode(data: AnyStr) -> AnyStr:
 def configure_logging(log_level_str: str) -> None:
     log_level = getattr(logging, log_level_str.upper())
 
+    root = logging.root
+    root.setLevel(log_level)
+
     fmt = (
         "%(asctime)s.%(msecs)-3d  |  %(levelname)-7s  |  PID:%(process)d  | "
         " %(message)s  [%(module)s::%(funcName)s::%(lineno)d]"
     )
     formatter = lambda datefmt: logging.Formatter(fmt, datefmt=datefmt)
-
-    root = logging.root
-    root.setLevel(log_level)
 
     sh = logging.StreamHandler()
     sh.formatter = formatter("%H:%M:%S")
@@ -1118,13 +1118,14 @@ def configure_logging(log_level_str: str) -> None:
     ]
     for log_dirname in all_log_dirs:
         if os.access(log_dirname, os.W_OK):
-            log_fname = f"{log_dirname}/{log_basename}"
+            log_fname = os.path.join(log_dirname, log_basename)
             break
 
     if log_fname is None:
         logger.warning(
             "We do not have permission to write to any of the following"
-            f" directories and thus cannot create a log file: {all_log_dirs}"
+            " directories and thus cannot create a log file: %r",
+            all_log_dirs,
         )
     else:
         fh = logging.FileHandler(log_fname)
