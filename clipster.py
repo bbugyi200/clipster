@@ -1194,20 +1194,22 @@ def main() -> int:
 
     # parse command-line arguments
     args = parse_args()
+    log_exception = lambda: logger.exception(
+        "Clipster crashed when an exception was raised: %r", args
+    )
 
     try:
         return run(args)
     except ClipsterError as exc:
         if logging.getLogger().getEffectiveLevel() == logging.DEBUG:
+            log_exception()
             raise
 
         # Only output the 'human-readable' part.
         logger.error(exc)
         return 1
     except Exception:
-        logger.exception(
-            "Clipster crashed when an exception was raised: %r", args
-        )
+        log_exception()
         raise
 
 
