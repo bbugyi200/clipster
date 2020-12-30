@@ -1141,9 +1141,6 @@ def run(args: ap.Namespace) -> int:
     # Find default config and data dirs
     conf_dir, data_dir = find_config()
 
-    # Enable logging
-    configure_logging(args.log_level.upper())
-
     config = parse_config(args, data_dir, conf_dir)
 
     # Launch the daemon
@@ -1197,6 +1194,10 @@ def main() -> int:
 
     # parse command-line arguments
     args = parse_args()
+
+    # Enable logging.
+    configure_logging(args.log_level.upper())
+
     log_exception = lambda: logger.exception(
         "Clipster crashed when an exception was raised: %r", args
     )
