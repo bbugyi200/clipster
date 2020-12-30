@@ -15,6 +15,7 @@ import socket
 import stat
 import sys
 import tempfile
+from urllib.error import URLError
 
 from gi import require_version
 import prometheus_client as pc
@@ -1092,6 +1093,17 @@ def main() -> int:
             else:
                 # Read from stdin and send to server
                 client.update()
+
+            try:
+                gateway_host = "localhost:9091"
+                pc.pushadd_to_gateway(
+                    gateway_host, job="clipster_client", registry=pc_registry
+                )
+            except URLError:
+                logging.warning(
+                    "The prometheus PushGateway does not seem to be online (%s).",
+                    gateway_host,
+                )
     except ClipsterError as exc:
         if logging.getLogger().getEffectiveLevel() == logging.DEBUG:
             raise
@@ -1100,9 +1112,6 @@ def main() -> int:
         logging.error(exc)
         return 1
     else:
-        pc.pushadd_to_gateway(
-            "localhost:9091", job="clipster_client", registry=pc_registry
-        )
         return 0
 
 
