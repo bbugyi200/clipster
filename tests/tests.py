@@ -5,14 +5,16 @@ import errno
 import json
 import logging
 import os
+from os import path
 import sys
 import unittest
 
 from gi import require_version
 
 
-sys.path.append(os.getcwd())
+sys.path.append(path.dirname(path.dirname(__file__)))
 import clipster  # type: ignore
+
 
 require_version("Gtk", "3.0")
 from gi.repository import Gdk, Gtk
