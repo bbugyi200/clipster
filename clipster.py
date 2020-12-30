@@ -270,7 +270,7 @@ class Daemon:
                 " (libwnck3)."
             )
 
-        self.pc_registry = pc.CollectorRegistry()
+        self.pc_registry = pc.REGISTRY
         self.pc_history_file_writes = pc.Counter(
             "clipster_history_file_writes",
             "Number of times the history file has been written to.",
@@ -839,7 +839,7 @@ class Daemon:
 
         # Start the prometheus metrics client.
         try:
-            pc.start_http_server(PC_HTTP_SERVER_PORT)
+            pc.start_http_server(PC_HTTP_SERVER_PORT, registry=self.pc_registry)
         except OSError as e:
             if e.errno == errno.EADDRINUSE:
                 logger.warning(

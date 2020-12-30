@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # vim: set fileencoding=utf-8 :
 
+from configparser import ConfigParser
 import errno
 import json
 import logging
@@ -158,6 +159,21 @@ class ClientTestCase(unittest.TestCase):
         self.assertEqual(output, "\0".join(self.history[board]))
 
 
+def Daemon(config: ConfigParser) -> clipster.Daemon:
+    """
+    Reinitialize prometheus_client.REGISTRY before creating each new clipster
+    daemon.
+    """
+    try:
+        import prometheus_client as pc
+
+        pc.REGISTRY = pc.CollectorRegistry()
+    except ImportError:
+        pass
+
+    return clipster.Daemon(config)
+
+
 class DaemonTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -185,7 +201,7 @@ class DaemonTestCase(unittest.TestCase):
             "CLIPBOARD": ["ape", "bear\nbear", "cat\ncat\n"],
             "PRIMARY": ["apple", "banana\nbanana", "clementine\nclementine\n"],
         }
-        self.daemon = clipster.Daemon(self.config)
+        self.daemon = Daemon(self.config)
 
     def tearDown(self):
         self.history = None
@@ -491,7 +507,7 @@ class DaemonTestCase(unittest.TestCase):
         self.config.set("clipster", "whitelist_classes", "subl3")
         # Parsing is done in Daemon.__init__()
         self.assertNotEqual(clipster.Wnck, None)
-        self.daemon = clipster.Daemon(self.config)
+        self.daemon = Daemon(self.config)
         # unnecessary assertion, already tested in the previous test above
         self.assertEqual(
             self.daemon.blacklist_classes, ["thunar", "chromium", "kate"]
