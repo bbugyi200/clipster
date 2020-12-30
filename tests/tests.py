@@ -344,7 +344,7 @@ class DaemonTestCase(unittest.TestCase):
         clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
         self.assertEqual(text, clipboard.wait_for_text())
 
-    @mock.patch("clipster.logging.error")
+    @mock.patch("clipster.logger.error")
     def test_process_msg_invalid(self, mock_logging):
         """Process an invalid client message."""
 
