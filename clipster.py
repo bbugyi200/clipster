@@ -262,9 +262,11 @@ class Daemon:
                 " (libwnck3)."
             )
 
+        self.pc_registry = pc.CollectorRegistry()
         self.pc_history_file_writes = pc.Counter(
             "clipster_history_file_writes",
             "Number of times the history file has been written to.",
+            registry=self.pc_registry,
         )
 
     def keypress_handler(
