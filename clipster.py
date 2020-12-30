@@ -1200,6 +1200,11 @@ def main() -> int:
         # Only output the 'human-readable' part.
         logger.error(exc)
         return 1
+    except Exception:
+        logger.exception(
+            "Clipster crashed when an exception was raised: %r", args
+        )
+        raise
     else:
         return 0
 
