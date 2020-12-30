@@ -22,7 +22,6 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 from urllib.error import URLError
 
 from gi import require_version
-import prometheus_client as pc
 
 
 require_version("Gdk", "3.0")
@@ -35,6 +34,15 @@ try:
     from gi.repository import Wnck
 except (ImportError, ValueError):
     Wnck = None
+
+# We only install 'prometheus_client' if the 'prometheus' setuptools extra is
+# specified at installation time.
+try:
+    import prometheus_client as pc
+except ImportError:
+    # Otherwise, we mock the 'prometheus_client' module.
+    from unittest import mock
+    pc = mock.MagicMock()
 
 
 logger = logging.getLogger(__name__)
