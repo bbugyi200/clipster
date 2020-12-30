@@ -2,7 +2,7 @@
 
 from __future__ import print_function
 
-import argparse
+import argparse as ap
 from configparser import ConfigParser
 from contextlib import closing
 import errno
@@ -16,7 +16,7 @@ import socket
 import stat
 import sys
 import tempfile
-from typing import Optional
+from typing import List, Optional, Tuple, Union
 from urllib.error import URLError
 
 from gi import require_version
@@ -40,6 +40,8 @@ pc_history_file_writes = pc.Counter(
     "clipster_history_file_writes",
     "Number of times the history file has been written to.",
 )
+
+AnyStr = Union[bytes, str]
 
 PC_GATEWAY_HOST = "localhost:9091"
 PC_HTTP_SERVER_PORT = 9102
@@ -67,11 +69,11 @@ class suppress_if_errno:
 
     """
 
-    def __init__(self, exceptions, exc_val):
+    def __init__(self, exceptions, exc_val) -> None:
         self._exceptions = exceptions
         self._exc_val = exc_val
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         pass
 
     def __exit__(self, exctype, excinst, exctb):
@@ -94,14 +96,14 @@ class suppress_if_errno:
 class ClipsterError(Exception):
     """Errors specific to Clipster."""
 
-    def __init__(self, args="Clipster Error."):
+    def __init__(self, args: str = "Clipster Error.") -> None:
         Exception.__init__(self, args)
 
 
 class Client:
     """Clipboard Manager."""
 
-    def __init__(self, config, args):
+    def __init__(self, config: ConfigParser, args: ap.Namespace) -> None:
         self.config = config
         self.args = args
         self.client_action = "SEND"
@@ -117,7 +119,7 @@ class Client:
             self.client_action = "BOARD"
         logger.debug("client_action: %s", self.client_action)
 
-    def update(self):
+    def update(self) -> None:
         """Send a signal and (optional) data from STDIN to daemon socket."""
 
         logger.debug("Connecting to server to update.")
@@ -128,10 +130,10 @@ class Client:
             # pylint:disable=no-member
             try:
                 sock.connect(self.config.get("clipster", "socket_file"))
-            except (socket.error, OSError):
+            except (socket.error, OSError) as e:
                 raise ClipsterError(
                     "Error connecting to socket. Is daemon running?"
-                )
+                ) from e
             logger.debug("Sending request to server.")
             # Fix for http://bugs.python.org/issue1633941 in py 2.x
             # Send message 'header' - count is 0 (i.e to be ignored)
@@ -160,10 +162,12 @@ class Client:
                         recv = sys.stdin.read(buf_size)
                     if not recv:
                         break
-                    recv = safe_decode(recv)
-                    sock.sendall(recv.encode("utf-8"))
 
-    def output(self):
+                    recv_str = safe_decode(recv)
+                    assert isinstance(recv_str, str)
+                    sock.sendall(recv_str.encode("utf-8"))
+
+    def output(self) -> str:
         """Send a signal and count to daemon socket requesting items from history."""
 
         logger.debug("Connecting to server to query history.")
@@ -174,10 +178,10 @@ class Client:
             # pylint:disable=no-member
             try:
                 sock.connect(self.config.get("clipster", "socket_file"))
-            except socket.error:
+            except socket.error as e:
                 raise ClipsterError(
                     "Error connecting to socket. Is daemon running?"
-                )
+                ) from e
             logger.debug("Sending request to server.")
             # Send message 'header'
             message = "{0}:{1}:{2}".format(
@@ -203,7 +207,9 @@ class Client:
         if data:
             # data is a list of 1 or more parts of a json string.
             # Reassemble this, then join with delimiter
-            return self.args.delim.join(json.loads("".join(data)))
+            return self.args.delim.join(json.loads("".join(data)))  # type: ignore
+        else:
+            return ""
 
 
 class Daemon:
@@ -251,7 +257,7 @@ class Daemon:
                 " (libwnck3)."
             )
 
-    def keypress_handler(self, widget, event, board, tree_select):
+    def keypress_handler(self, widget, event, board, tree_select) -> None:
         """Handle selection_widget keypress events."""
 
         # Handle select with return or mouse
@@ -264,7 +270,7 @@ class Daemon:
         if event.keyval == Gdk.KEY_Escape:
             self.window.hide()
 
-    def delete_handler(self, event, board, tree_select):
+    def delete_handler(self, event, board, tree_select) -> None:
         """Delete selected history entries."""
 
         model, treepaths = tree_select.get_selected_rows()
@@ -295,7 +301,7 @@ class Daemon:
             # Remove entry from UI
             model.remove(treeiter)
 
-    def activate_handler(self, event, board, tree_select):
+    def activate_handler(self, event, board, tree_select) -> None:
         """Action selected history items."""
 
         # Get selection
@@ -309,7 +315,7 @@ class Daemon:
         model.clear()
         self.window.hide()
 
-    def selection_widget(self, board):
+    def selection_widget(self, board) -> None:
         """GUI window for selecting items from clipboard history."""
 
         # Create windows & widgets
@@ -379,7 +385,7 @@ class Daemon:
         self.window.set_size_request(500, 500)
         self.window.show_all()
 
-    def read_history_file(self):
+    def read_history_file(self) -> None:
         """Read clipboard history from file."""
 
         try:
@@ -390,7 +396,7 @@ class Daemon:
                 # Not an error if there is no history file
                 raise
 
-    def write_history_file(self):
+    def write_history_file(self) -> bool:
         """Write clipboard history to file."""
 
         if self.update_history_file:
@@ -418,7 +424,7 @@ class Daemon:
 
         return safe_decode(getattr(self, board.lower()).wait_for_text())
 
-    def update_board(self, board, data=""):
+    def update_board(self, board, data="") -> None:
         """Update a clipboard. Will trigger an owner-change event."""
 
         selection = getattr(self, board.lower())
@@ -426,7 +432,7 @@ class Daemon:
         if not data:
             selection.clear()
 
-    def remove_history(self, board, text):
+    def remove_history(self, board, text) -> None:
         """If text exists in the history, remove it."""
 
         if text in self.boards[board]:
@@ -435,7 +441,7 @@ class Daemon:
             # Flag the history file for updating
             self.update_history_file = True
 
-    def update_history(self, board, text):
+    def update_history(self, board, text) -> None:
         """Update the in-memory clipboard history."""
 
         for ignore in self.ignore_patterns:
@@ -529,7 +535,7 @@ class Daemon:
                 logger.debug("Syncing board %s to %s", board, boards[0])
                 self.update_board(boards[0], text)
 
-    def owner_change(self, board, event):
+    def owner_change(self, board, event) -> bool:
         """Handler for owner-change clipboard events."""
 
         logger.debug("owner-change event!")
@@ -538,7 +544,7 @@ class Daemon:
         active = self.config.get("clipster", "active_selections").split(",")
 
         if selection not in active:
-            return
+            return False
 
         # Only monitor owner-change events for apps with WM_CLASS values found
         # in whitelist and not found in blacklist
@@ -586,8 +592,9 @@ class Daemon:
 
         # Unblock event handling
         board.handler_unblock(event_id)
+        return False
 
-    def socket_accept(self, sock, _):
+    def socket_accept(self, sock, _) -> bool:
         """Accept a connection and 'select' it for readability."""
 
         conn, _ = sock.accept()
@@ -596,7 +603,7 @@ class Daemon:
         logger.debug("Client connection received.")
         return True
 
-    def socket_recv(self, conn, _):
+    def socket_recv(self, conn, _) -> bool:
         """Try to recv from an accepted connection."""
 
         max_input = self.config.getint("clipster", "max_input")
@@ -617,7 +624,7 @@ class Daemon:
         # Return false to remove conn from GObject.io_add_watch list
         return False
 
-    def process_msg(self, conn):
+    def process_msg(self, conn) -> None:
         """Process message received from client, sending reply if required."""
 
         try:
@@ -690,7 +697,7 @@ class Daemon:
             self.update_board(board)
             self.update_history_file = True
 
-    def read_patt_file(self, name):
+    def read_patt_file(self, name: str) -> List[str]:
         """Get a series of regexes (one per line) from a file and return as a list."""
         try:
             patfile = os.path.join(
@@ -704,6 +711,7 @@ class Daemon:
             logger.warning(
                 "Unable to read patterns file: %s %s", patfile, exc.strerror
             )
+            return []
 
     def prepare_files(self) -> None:
         """Ensure that all files and sockets used
@@ -848,7 +856,7 @@ def get_wm_class_from_active_window():
     return wm_class
 
 
-def get_list_from_option_string(string):
+def get_list_from_option_string(string: str) -> List[str]:
     """Parse a configured option's string of elements,
     splits it around "," and returns a list of items in lower case,
     or an empty list if string was empty."""
@@ -857,10 +865,10 @@ def get_list_from_option_string(string):
     return []
 
 
-def parse_args():
+def parse_args() -> ap.Namespace:
     """Parse command-line arguments."""
 
-    parser = argparse.ArgumentParser(description="Clipster clipboard manager.")
+    parser = ap.ArgumentParser(description="Clipster clipboard manager.")
     parser.add_argument(
         "-f", "--config", action="store", help="Path to config directory."
     )
@@ -965,7 +973,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def parse_config(args, data_dir, conf_dir) -> ConfigParser:
+def parse_config(args: ap.Namespace, data_dir: str, conf_dir: str) -> ConfigParser:
     """Configuration derived from defaults & file."""
 
     # Set some config defaults
@@ -1017,7 +1025,7 @@ def parse_config(args, data_dir, conf_dir) -> ConfigParser:
     return config
 
 
-def find_config():
+def find_config() -> Tuple[str, str]:
     """Attempt to find config from xdg basedir-spec paths/environment variables."""
 
     # Set a default directory for clipster files
@@ -1026,11 +1034,11 @@ def find_config():
     xdg_config_dirs.insert(
         0,
         os.environ.get(
-            "XDG_CONFIG_HOME", os.path.join(os.environ.get("HOME"), ".config")
+            "XDG_CONFIG_HOME", os.path.join(os.environ["HOME"], ".config")
         ),
     )
     xdg_data_home = os.environ.get(
-        "XDG_DATA_HOME", os.path.join(os.environ.get("HOME"), ".local/share")
+        "XDG_DATA_HOME", os.path.join(os.environ["HOME"], ".local/share")
     )
 
     data_dir = os.path.join(xdg_data_home, "clipster")
@@ -1042,14 +1050,15 @@ def find_config():
     return "", data_dir
 
 
-def safe_decode(data):
+def safe_decode(data: AnyStr) -> AnyStr:
     """Convenience method to ensure everything is utf-8."""
 
     try:
-        data = data.decode("utf-8")
+        result = data.decode("utf-8")  # type: ignore
     except (UnicodeDecodeError, UnicodeEncodeError, AttributeError):
-        pass
-    return data
+        result = data
+
+    return result
 
 
 def configure_logging(log_level_str: str) -> None:
@@ -1138,9 +1147,6 @@ def main() -> int:
                 # Ask server for clipboard history
                 output = client.output()
                 pc_history_count.inc(len(output.split(args.delim)))
-                if not isinstance(output, str):
-                    # python2 needs unicode explicitly encoded
-                    output = output.encode("utf-8")
                 print(output, end="")
             else:
                 # Read from stdin and send to server
