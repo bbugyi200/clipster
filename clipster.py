@@ -223,9 +223,11 @@ class Daemon:
         """Set up clipboard objects and history dict."""
 
         self.config = config
-        self.patterns = []
-        self.ignore_patterns = []
-        self.window = self.p_id = self.c_id = None
+        self.patterns: List[str] = []
+        self.ignore_patterns: List[str] = []
+        self.p_id: Optional[int] = None
+        self.c_id: Optional[int] = None
+        self.window: Optional[Gtk.Dialog] = None
         self.sock: Optional[socket.socket] = None
         self.sock_file = self.config.get("clipster", "socket_file")
         self.primary = Gtk.Clipboard.get(Gdk.SELECTION_PRIMARY)
@@ -233,7 +235,7 @@ class Daemon:
         self.boards: Dict[str, List[str]] = {"PRIMARY": [], "CLIPBOARD": []}
         self.hist_file = self.config.get("clipster", "history_file")
         self.pid_file = self.config.get("clipster", "pid_file")
-        self.client_msgs = {}
+        self.client_msgs: Dict[int, List[str]] = {}
         # Flag to indicate that the in-memory history should be flushed to disk
         self.update_history_file = False
         # Flag whether next clipboard change should be ignored
@@ -282,6 +284,7 @@ class Daemon:
             self.delete_handler(event, board, tree_select)
         # Hide window if ESC is pressed
         if event.keyval == Gdk.KEY_Escape:
+            assert self.window is not None
             self.window.hide()
 
     def delete_handler(
@@ -330,6 +333,7 @@ class Daemon:
             self.update_board(board, data)
             self.update_history(board, data)
         model.clear()
+        assert self.window is not None
         self.window.hide()
 
     def selection_widget(self, board: str) -> None:
@@ -578,11 +582,14 @@ class Daemon:
                 return True
 
         logger.debug("Selection in 'active_selections'")
-        event_id = selection == "PRIMARY" and self.p_id or self.c_id
+        event_id = self.p_id if selection == "PRIMARY" else self.c_id
         # Some apps update primary during mouse drag (chrome)
         # Block at start to prevent repeated triggering
         board.handler_block(event_id)
+
+        assert self.window is not None
         display = self.window.get_display()
+
         while Gdk.ModifierType.BUTTON1_MASK & display.get_pointer().mask:
             # Do nothing while mouse button is held down (selection drag)
             pass
@@ -628,6 +635,7 @@ class Daemon:
         recv_total = sum(len(x) for x in self.client_msgs[conn.fileno()])
         try:
             recv = safe_decode(conn.recv(min(8192, max_input - recv_total)))
+            assert isinstance(recv, str)
             self.client_msgs[conn.fileno()].append(recv)
             recv_total += len(recv)
             if not recv or recv_total >= max_input:
@@ -651,14 +659,15 @@ class Daemon:
             return
         try:
             msg_parts = msg_str.split(":", 3)
+            content: Optional[str]
             if len(msg_parts) == 4:
-                sig, board, count, content = msg_parts
+                sig, board, count_str, content = msg_parts
             elif len(msg_parts) == 3:
-                sig, board, count = msg_parts
+                sig, board, count_str = msg_parts
                 content = None
             else:
                 raise ValueError()
-            count = int(count)
+            count = int(count_str)
         except (TypeError, ValueError):
             logger.error("Invalid message received via socket: %s", msg_str)
             return
