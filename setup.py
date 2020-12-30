@@ -14,7 +14,6 @@ def extras_require() -> Dict[str, List[str]]:
     result = {}
     for extra in ["prometheus"]:
         result[extra] = list(_requires("extra-requirements.txt", extra=extra))
-
     return result
 
 
