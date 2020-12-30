@@ -39,6 +39,9 @@ pc_history_file_writes = pc.Counter(
     "Number of times the history file has been written to.",
 )
 
+PC_GATEWAY_HOST = "localhost:9091"
+PC_HTTP_SERVER_PORT = 9102
+
 
 class suppress_if_errno:
     """
@@ -632,9 +635,7 @@ class Daemon:
         except (TypeError, ValueError):
             logger.error("Invalid message received via socket: %s", msg_str)
             return
-        logger.debug(
-            "Received: sig:%s, board:%s, count:%s", sig, board, count
-        )
+        logger.debug("Received: sig:%s, board:%s, count:%s", sig, board, count)
         if sig == "SELECT":
             self.selection_widget(board)
         elif sig == "SEND":
@@ -702,7 +703,7 @@ class Daemon:
                 "Unable to read patterns file: %s %s", patfile, exc.strerror
             )
 
-    def prepare_files(self):
+    def prepare_files(self) -> None:
         """Ensure that all files and sockets used
         by the daemon are available."""
 
@@ -779,9 +780,7 @@ class Daemon:
         try:
             self.write_history_file()
         except FileNotFoundError:
-            logger.warning(
-                "Failed to update history file: %s", self.hist_file
-            )
+            logger.warning("Failed to update history file: %s", self.hist_file)
         Gtk.main_quit()
 
     def run(self):
@@ -792,7 +791,17 @@ class Daemon:
         self.prepare_files()
 
         # Start the prometheus metrics client.
-        pc.start_http_server(9102)
+        try:
+            pc.start_http_server(PC_HTTP_SERVER_PORT)
+        except OSError as e:
+            if e.errno == errno.EADDRINUSE:
+                logger.warning(
+                    "The prometheus server failed to start, since the network"
+                    " port %d is already in use.",
+                    PC_HTTP_SERVER_PORT,
+                )
+            else:
+                raise
 
         # We need to get the display instance from the window
         # for use in obtaining mouse state.
@@ -1096,14 +1105,16 @@ def main() -> int:
                 client.update()
 
             try:
-                gateway_host = "localhost:9091"
                 pc.pushadd_to_gateway(
-                    gateway_host, job="clipster_client", registry=pc_registry
+                    PC_GATEWAY_HOST,
+                    job="clipster_client",
+                    registry=pc_registry,
                 )
             except URLError:
                 logger.warning(
-                    "The prometheus PushGateway does not seem to be online (%s).",
-                    gateway_host,
+                    "The prometheus PushGateway does not seem to be online"
+                    " (%s).",
+                    PC_GATEWAY_HOST,
                 )
     except ClipsterError as exc:
         if logging.getLogger().getEffectiveLevel() == logging.DEBUG:
