@@ -33,7 +33,6 @@ except (ImportError, ValueError):
     Wnck = None
 
 
-pc_registry = pc.CollectorRegistry()
 pc_history_file_writes = pc.Counter(
     "clipster_history_file_writes",
     "Number of times the history file has been written to.",
@@ -1076,6 +1075,7 @@ def main() -> int:
             config.set("clipster", "default_selection", board)
             client = Client(config, args)
 
+            pc_registry = pc.CollectorRegistry()
             pc_history_count = pc.Counter(
                 "clipster_history_count",
                 "Count of items retrieved from clipster's history file by"
