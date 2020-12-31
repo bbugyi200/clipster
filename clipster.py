@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 AnyStr = Union[bytes, str]
 
-PC_GATEWAY_HOST = "localhost:9091"
+PC_PUSH_GATEWAY_HOST = "localhost:9091"
 PC_HTTP_SERVER_PORT = 9102
 
 
@@ -1184,14 +1184,14 @@ def run(args: ap.Namespace) -> int:
 
         try:
             pc.pushadd_to_gateway(
-                PC_GATEWAY_HOST,
+                PC_PUSH_GATEWAY_HOST,
                 job="clipster_client",
                 registry=pc_registry,
             )
         except URLError:
             logger.warning(
                 "The prometheus PushGateway does not seem to be online (%s).",
-                PC_GATEWAY_HOST,
+                PC_PUSH_GATEWAY_HOST,
             )
 
     return 0
