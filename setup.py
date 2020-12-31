@@ -35,8 +35,8 @@ def _requires(reqtxt_basename: str, extra: str = None) -> Iterator[str]:
 
 
 setup(
+    ### Project Description
     name="clipster",
-    setup_requires=["setuptools_scm"],
     use_scm_version=True,
     url="https://github.com/mrichar1/clipster",
     license="LICENSE.md",
@@ -44,6 +44,11 @@ setup(
     author_email="",
     description="python clipboard manager",
     long_description=__doc__,
+    ### Package Requirements (i.e. dependencies)
+    setup_requires=["setuptools_scm"],
+    install_requires=install_requires(),
+    extras_require=extras_require(),
+    ### Package Contents
     packages=find_packages(exclude=["tests"]),
     include_package_data=True,
     data_files=[
@@ -51,23 +56,15 @@ setup(
         ("share/doc/clipster", ["README.md"]),
     ],
     zip_safe=False,
-    platforms="any",
-    install_requires=install_requires(),
-    extras_require=extras_require(),
     entry_points={
         "console_scripts": [
             "clipster = clipster:main",
         ]
     },
+    ### Platform / System Requirements
+    platforms="any",
     classifiers=[
-        # As from http://pypi.python.org/pypi?%3Aaction=list_classifiers
-        # 'Development Status :: 1 - Planning',
-        # 'Development Status :: 2 - Pre-Alpha',
-        # 'Development Status :: 3 - Alpha',
-        # 'Development Status :: 4 - Beta',
         "Development Status :: 5 - Production/Stable",
-        # 'Development Status :: 6 - Mature',
-        # 'Development Status :: 7 - Inactive',
         "Environment :: Console",
         "Environment :: X11 Applications",
         "Intended Audience :: End Users/Desktop",
