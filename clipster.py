@@ -233,8 +233,8 @@ class Daemon:
 
     def __init__(self, config: ConfigParser) -> None:
         """Set up clipboard objects and history dict."""
-
         self.config = config
+
         self.patterns: List[str] = []
         self.ignore_patterns: List[str] = []
         self.p_id: Optional[int] = None
@@ -248,10 +248,14 @@ class Daemon:
         self.hist_file = self.config.get("clipster", "history_file")
         self.pid_file = self.config.get("clipster", "pid_file")
         self.client_msgs: Dict[int, List[str]] = {}
+
         # Flag to indicate that the in-memory history should be flushed to disk
         self.update_history_file = False
+
         # Flag whether next clipboard change should be ignored
         self.ignore_next = {"PRIMARY": False, "CLIPBOARD": False}
+
+        # Blacklist / Whitelist Classes
         self.whitelist_classes = self.blacklist_classes = []
         if Wnck:
             self.blacklist_classes = get_list_from_option_string(
@@ -274,6 +278,7 @@ class Daemon:
                 " (libwnck3)."
             )
 
+        # Prometheus Variables
         self.pc_registry = pc.REGISTRY
         self.pc_history_file_writes = pc.Counter(
             "clipster_history_file_writes",
