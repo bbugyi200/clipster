@@ -843,6 +843,8 @@ class Daemon:
         # Set up socket, pid file etc
         self.prepare_files()
 
+        logger.info("Starting Clipster Daemon...")
+
         # Start the prometheus metrics client.
         try:
             pc.start_http_server(
