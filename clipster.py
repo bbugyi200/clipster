@@ -18,7 +18,8 @@ import socket
 import stat
 import sys
 import tempfile
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from types import TracebackType
+from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 from urllib.error import URLError
 
 from gi import require_version
@@ -42,6 +43,7 @@ try:
 except ImportError:
     # Otherwise, we mock the 'prometheus_client' module.
     from unittest import mock
+
     pc = mock.MagicMock()
 
 
@@ -75,10 +77,10 @@ class suppress_if_errno:
 
     """
 
+    OS = TypeVar("OS", bound=OSError)
+
     def __init__(
-        self,
-        exceptions: Union[Type[Exception], Tuple[Type[Exception], ...]],
-        exc_val: int,
+        self, exceptions: Union[Type[OS], Tuple[Type[OS], ...]], exc_val: int
     ) -> None:
         self._exceptions = exceptions
         self._exc_val = exc_val
@@ -86,7 +88,12 @@ class suppress_if_errno:
     def __enter__(self) -> None:
         pass
 
-    def __exit__(self, exctype: Any, excinst: Any, exctb: Any) -> Any:
+    def __exit__(
+        self,
+        exctype: Optional[Type[OS]],
+        excinst: Optional[OS],
+        exctb: Optional[TracebackType],
+    ) -> bool:
         # Unlike isinstance and issubclass, CPython exception handling
         # currently only looks at the concrete type hierarchy (ignoring
         # the instance and subclass checking hooks). While Guido considers
@@ -98,6 +105,7 @@ class suppress_if_errno:
         # See http://bugs.python.org/issue12029 for more details
         return (
             exctype is not None
+            and excinst is not None
             and issubclass(exctype, self._exceptions)
             and excinst.errno == self._exc_val
         )
@@ -839,7 +847,9 @@ class Daemon:
 
         # Start the prometheus metrics client.
         try:
-            pc.start_http_server(PC_HTTP_SERVER_PORT, registry=self.pc_registry)
+            pc.start_http_server(
+                PC_HTTP_SERVER_PORT, registry=self.pc_registry
+            )
         except OSError as e:
             if e.errno == errno.EADDRINUSE:
                 logger.warning(
