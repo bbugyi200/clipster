@@ -2,8 +2,6 @@
 
 # pylint: disable=line-too-long
 
-from __future__ import print_function
-
 import argparse as ap
 from configparser import ConfigParser
 from contextlib import closing
