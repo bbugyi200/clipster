@@ -24,11 +24,9 @@ from urllib.error import URLError
 
 from gi import require_version
 
-
 require_version("Gdk", "3.0")
 require_version("Gtk", "3.0")
 from gi.repository import Gdk, GLib, GObject, Gtk
-
 
 try:
     require_version("Wnck", "3.0")
@@ -450,7 +448,7 @@ class Daemon:
                 with tempfile.NamedTemporaryFile(
                     dir=self.config.get("clipster", "data_dir"), delete=False
                 ) as tmp_file:
-                    tmp_file.write(json.dumps(hist).encode("utf-8"))
+                    tmp_file.write(json.dumps(hist, indent=2).encode("utf-8"))
                 os.rename(tmp_file.name, self.hist_file)
                 self.update_history_file = False
         else:
