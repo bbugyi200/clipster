@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import re
-from typing import Dict, Iterator, List, Optional, Union
+from typing import Dict, Iterator, List, Union
 
 
 PathLike = Union[str, Path]
@@ -30,9 +30,13 @@ def _requires(reqtxt_basename: str, extra: str = None) -> Iterator[str]:
         if not line or line.lstrip().startswith(("#", "-")):
             continue
 
-        package = line.split(" ")[0].strip()
+        package = line.split("#")[0].strip()
+        line_extras = _get_extras(line)
 
-        if extra != _get_extra(line):
+        if extra is None and line_extras:
+            continue
+
+        if extra is not None and extra not in line_extras:
             continue
 
         yield package
@@ -42,17 +46,18 @@ def _collect_extras(reqtxt: PathLike) -> Iterator[str]:
     reqtxt = Path(reqtxt)
     extra_set = set()
     for line in reqtxt.open():
-        extra = _get_extra(line)
-        if extra is None:
+        extras = _get_extras(line)
+        if not extras:
             continue
 
-        if extra not in extra_set:
-            yield extra
-            extra_set.add(extra)
+        for extra in extras:
+            if extra not in extra_set:
+                yield extra
+                extra_set.add(extra)
 
 
-def _get_extra(line: str) -> Optional[str]:
+def _get_extras(line: str) -> List[str]:
     if not re.match(r"^[A-Za-z].* # \S+\s*$", line):
-        return None
+        return []
 
-    return line.split("#")[1].strip()
+    return line.split("#")[1].strip().split(",")

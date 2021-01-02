@@ -1,5 +1,7 @@
 # Each "extra" package should have a corresponding inline comment which
-# specifies which setuptools "extra" category it belongs to.
+# specifies which setuptools "extra" category(s) it belongs to (if the package
+# belongs to multiple extra categories, the category names should be seperated
+# by commas).
 
 prometheus_client  # prometheus
 pygobject
