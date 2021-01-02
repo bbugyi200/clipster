@@ -41,7 +41,7 @@ def _collect_extras(reqtxt: PathLike) -> Iterator[str]:
     reqtxt = Path(reqtxt)
     extra_set = set()
     for line in reqtxt.open():
-        if re.search(r" # \S+\s*$", line):
+        if re.match(r"^[A-Za-z].* # \S+\s*$", line):
             extra = line.split("#")[1].strip()
             if extra not in extra_set:
                 yield extra
