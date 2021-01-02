@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import re
-from typing import Dict, Iterator, List, Union
+from typing import Dict, Iterator, List, Optional, Union
 
 
 PathLike = Union[str, Path]
@@ -14,35 +14,45 @@ def install_requires() -> List[str]:
 
 def extras_require() -> Dict[str, List[str]]:
     result = {}
+
     reqtxt = "extra-requirements.txt"
     for extra in _collect_extras(reqtxt):
         result[extra] = list(_requires(reqtxt, extra=extra))
+
     return result
 
 
 def _requires(reqtxt_basename: str, extra: str = None) -> Iterator[str]:
     reqtxt = Path(__file__).parent / reqtxt_basename
-    reqs = reqtxt.read_text().split("\n")
-    for req in reqs:
-        if not req or req.lstrip().startswith(("#", "-")):
+    for line in reqtxt.open():
+        if not line or line.lstrip().startswith(("#", "-")):
             continue
 
-        req_and_comment = [x.strip() for x in req.split("#")]
+        package = line.split(" ")[0].strip()
 
-        if extra is not None and (
-            len(req_and_comment) == 1 or req_and_comment[1] != extra
-        ):
-            continue
+        if extra is not None:
+            line_extra = _get_extra(line)
+            if extra != line_extra:
+                continue
 
-        yield req_and_comment[0]
+        yield package
 
 
 def _collect_extras(reqtxt: PathLike) -> Iterator[str]:
     reqtxt = Path(reqtxt)
     extra_set = set()
     for line in reqtxt.open():
-        if re.match(r"^[A-Za-z].* # \S+\s*$", line):
-            extra = line.split("#")[1].strip()
-            if extra not in extra_set:
-                yield extra
-                extra_set.add(extra)
+        extra = _get_extra(line)
+        if extra is None:
+            continue
+
+        if extra not in extra_set:
+            yield extra
+            extra_set.add(extra)
+
+
+def _get_extra(line: str) -> Optional[str]:
+    if not re.match(r"^[A-Za-z].* # \S+\s*$", line):
+        return None
+
+    return line.split("#")[1].strip()
