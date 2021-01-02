@@ -1,4 +1,0 @@
-# Extra Requirements. Each package should have a corresponding inline comment which
-# specifies which setuptools "extra" category it belongs to.
-
-prometheus_client  # prometheus

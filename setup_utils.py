@@ -15,7 +15,7 @@ def install_requires() -> List[str]:
 def extras_require() -> Dict[str, List[str]]:
     result = {}
 
-    reqtxt = "extra-requirements.txt"
+    reqtxt = "requirements.txt"
     for extra in _collect_extras(reqtxt):
         result[extra] = list(_requires(reqtxt, extra=extra))
 
@@ -25,15 +25,15 @@ def extras_require() -> Dict[str, List[str]]:
 def _requires(reqtxt_basename: str, extra: str = None) -> Iterator[str]:
     reqtxt = Path(__file__).parent / reqtxt_basename
     for line in reqtxt.open():
+        line = line.strip()
+
         if not line or line.lstrip().startswith(("#", "-")):
             continue
 
         package = line.split(" ")[0].strip()
 
-        if extra is not None:
-            line_extra = _get_extra(line)
-            if extra != line_extra:
-                continue
+        if extra != _get_extra(line):
+            continue
 
         yield package
 
