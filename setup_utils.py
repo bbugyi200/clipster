@@ -47,9 +47,6 @@ def _collect_extras(reqtxt: PathLike) -> Iterator[str]:
     extra_set = set()
     for line in reqtxt.open():
         extras = _get_extras(line)
-        if not extras:
-            continue
-
         for extra in extras:
             if extra not in extra_set:
                 yield extra
