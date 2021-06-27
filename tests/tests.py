@@ -72,9 +72,7 @@ class ClientTestCase(unittest.TestCase):
         # Set to an explicit value for testing
         cls.data_dir = "/data_dir"
         cls.conf_dir = "/conf_dir"
-        cls.config = clipster.parse_config(
-            cls.args, cls.data_dir, cls.conf_dir
-        )
+        cls.config = clipster.parse_config(cls.args, cls.data_dir, cls.conf_dir)
         cls.logger = logging.getLogger()
 
     #        cls.logger.level = logging.DEBUG
@@ -114,9 +112,7 @@ class ClientTestCase(unittest.TestCase):
             in sock.mock_calls
         )
         self.assertTrue(
-            mock.call.sendall(
-                "{}:{}:0".format(client_action, board).encode("utf-8")
-            )
+            mock.call.sendall("{}:{}:0".format(client_action, board).encode("utf-8"))
             in sock.mock_calls
         )
 
@@ -192,9 +188,7 @@ class DaemonTestCase(unittest.TestCase):
         # Set to an explicit value for testing
         self.data_dir = "/data_dir"
         self.conf_dir = "/conf_dir"
-        self.config = clipster.parse_config(
-            self.args, self.data_dir, self.conf_dir
-        )
+        self.config = clipster.parse_config(self.args, self.data_dir, self.conf_dir)
 
         # Set up a fake history
         self.history = {
@@ -244,9 +238,7 @@ class DaemonTestCase(unittest.TestCase):
         mock_tmp.return_value.__enter__.return_value = mock_file
         self.daemon.write_history_file()
         # Get the json passed to write()
-        saved_history = json.loads(
-            mock_file.mock_calls[0][1][0].decode("utf-8")
-        )
+        saved_history = json.loads(mock_file.mock_calls[0][1][0].decode("utf-8"))
         # Check the written history still has same keys
         self.assertEqual(saved_history.keys(), self.history.keys())
         # Check that there are only 2 items in each list
@@ -385,9 +377,7 @@ class DaemonTestCase(unittest.TestCase):
         board = "PRIMARY"
         count = "0"
         msg = "Hello world\n"
-        self.daemon.client_msgs = {
-            1: "{}:{}:{}:{}".format(action, board, count, msg)
-        }
+        self.daemon.client_msgs = {1: "{}:{}:{}:{}".format(action, board, count, msg)}
         self.daemon.process_msg(conn)
         mock_update_board.assert_called_with(board, msg)
 
@@ -501,17 +491,13 @@ class DaemonTestCase(unittest.TestCase):
         """Test that config strings for whitelist_classes and blacklist_classes
         are parsed and stored properly in their respsecive class field."""
 
-        self.config.set(
-            "clipster", "blacklist_classes", "thunar,chromium,kate"
-        )
+        self.config.set("clipster", "blacklist_classes", "thunar,chromium,kate")
         self.config.set("clipster", "whitelist_classes", "subl3")
         # Parsing is done in Daemon.__init__()
         self.assertNotEqual(clipster.Wnck, None)
         self.daemon = Daemon(self.config)
         # unnecessary assertion, already tested in the previous test above
-        self.assertEqual(
-            self.daemon.blacklist_classes, ["thunar", "chromium", "kate"]
-        )
+        self.assertEqual(self.daemon.blacklist_classes, ["thunar", "chromium", "kate"])
         self.assertEqual(self.daemon.whitelist_classes, ["subl3"])
 
     @mock.patch("clipster.get_wm_class_from_active_window")
